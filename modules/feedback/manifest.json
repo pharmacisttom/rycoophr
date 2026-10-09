@@ -1,1 +1,12 @@
-{"name":"feedback","version":"2.0.0-alpha.1","permissions":["feedback.view","feedback.manage"],"sandbox":true,"routes":["/api/v1/feedback"],"events":["feedback.created","feedback.updated"],"services":[],"migrations":[],"configuration":{},"ui":"Feedback"}
+{
+  "name": "feedback",
+  "version": "2.0.0-alpha.1",
+  "permissions": ["feedback.view", "feedback.manage"],
+  "sandbox": true,
+  "routes": ["/api/v1/feedback"],
+  "events": ["feedback.created", "feedback.updated"],
+  "services": [],
+  "migrations": [],
+  "configuration": {},
+  "ui": "Feedback"
+}

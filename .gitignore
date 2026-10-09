@@ -3,3 +3,10 @@ node_modules/
 data/
 *.log
 .v1-audit/
+tmp/
+output/
+docs/article-extracted.txt
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.key

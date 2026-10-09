@@ -1,1 +1,29 @@
-{"name":"tomvis-framework","version":"2.0.0-alpha.1","private":true,"type":"module","engines":{"node":">=22.17"},"scripts":{"dev":"node apps/server.js","start":"node apps/server.js","test":"node --test tests/*.test.js","doctor":"node scripts/doctor.js","build":"node --check apps/server.js && node --check apps/public/app.js","deploy:check":"node scripts/doctor.js"}}
+{
+  "name": "rycoophr",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.17"
+  },
+  "scripts": {
+    "dev": "node apps/server.js",
+    "start": "node apps/server.js",
+    "test": "node --test tests/*.test.js",
+    "doctor": "node scripts/doctor.mjs",
+    "build": "node scripts/check.mjs",
+    "deploy:check": "node scripts/doctor.mjs",
+    "backup": "node scripts/backup.mjs"
+  },
+  "dependencies": {
+    "exceljs": "^4.4.0",
+    "qrcode": "^1.5.4"
+  },
+  "description": "Rayong cooperative personnel and board management based on Tomvis V2",
+  "overrides": {
+    "uuid": "11.1.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.9"
+  }
+}

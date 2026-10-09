@@ -1,0 +1,8 @@
+{$RYCOOP_DOMAIN:rycoophr.tomvisolution.tech} {
+    encode gzip zstd
+    request_body {
+        max_size 2MB
+    }
+    reverse_proxy app:3013
+    header Strict-Transport-Security "max-age=31536000"
+}

@@ -1,0 +1,38 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      RYCOOP_MODE: production
+      RYCOOP_ORIGIN: https://${RYCOOP_DOMAIN:-rycoophr.tomvisolution.tech}
+      RYCOOP_ADMIN_PASSWORD: ${RYCOOP_ADMIN_PASSWORD:?Set bootstrap password}
+      RYCOOP_TOTP_KEY: ${RYCOOP_TOTP_KEY:?Set persistent 64-character hex encryption key}
+      PORT: 3013
+      TZ: Asia/Bangkok
+    volumes:
+      - hr_data:/app/data
+    expose:
+      - "3013"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      RYCOOP_DOMAIN: ${RYCOOP_DOMAIN:-rycoophr.tomvisolution.tech}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+volumes:
+  hr_data:
+  caddy_data:
+  caddy_config:

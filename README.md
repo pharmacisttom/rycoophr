@@ -1,21 +1,57 @@
-# Tomvis V2 — local Sandbox prototype
+# rycoopHR
 
-Version 2.0.0-alpha.1. Independent Feedback reference prototype. V1 source at https://github.com/pharmacisttom/Tomvis is preserved; this prototype is **not a completed migration or production framework**. Target repository: https://github.com/pharmacisttom/tomvis2.0.
+ระบบบุคลากรและกรรมการ **สหกรณ์ออมทรัพย์สาธารณสุขระยอง จำกัด** รุ่นทดสอบ 0.1.0
+ต่อยอดจาก [Tomvis V2](https://github.com/pharmacisttom/tomvis2.0) โดยคง session, RBAC, tenant isolation และ audit ของต้นแบบ
 
-Requires Node 22.17+ with native experimental SQLite. No npm dependencies.
+ประกอบด้วยทะเบียนเจ้าหน้าที่ สวัสดิการ เงินเดือน/โบนัส นำเข้า Excel เวลาเข้าออก ใบลา/ขาด/สาย เช็กอินมือถือ GPS และงาน/ผลงานกรรมการแยกจาก HR
+รองรับ Google Authenticator สำหรับบัญชีแอดมิน **pharmacisttom@gmail.com**; สร้าง QR ภายในระบบ เข้ารหัส secret และให้รหัสกู้คืนแบบใช้ครั้งเดียว แอดมินต้องตั้งค่า 2FA ก่อนใช้งาน
 
-PowerShell:
+## ทดสอบในเครื่อง
+
+ต้องมี Node 22.17+ (native SQLite)
+
 ```powershell
-$env:TOMVIS_MODE='sandbox'
-$env:TOMVIS_DEMO_PASSWORD=Read-Host 'Choose local demo password (at least 12 characters)'
+npm ci
+$env:RYCOOP_MODE='sandbox'
+$env:RYCOOP_ADMIN_PASSWORD=Read-Host 'กำหนดรหัสผ่านทดลองอย่างน้อย 12 ตัว'
+$env:PORT='3013'
 npm run dev
 ```
-Open http://localhost:3000. Accounts: admin@tomvis.demo, staff@tomvis.demo, viewer@tomvis.demo. All use the password supplied at first initialization. Changing the environment password does not change existing database accounts. `.env.example` documents variables; `.env` is not automatically loaded.
 
-Includes dashboard, persistent Feedback create/resolve/search/filter, users, permission matrix, audit viewer, confirmed tenant-scoped reset, and planned-module catalog. Supports sandbox/demo/development only, bound to loopback. Every tenant read/write is scoped to the authenticated membership. No production connectors or credentials are used.
+เปิด http://localhost:3013 ด้วยบัญชี `pharmacisttom@gmail.com` และรหัสที่กำหนดเอง
+สแกน QR ใน Google Authenticator ยืนยันรหัส 6 หลัก แล้วเก็บรหัสกู้คืน
+Sandbox มีบัญชีทดลองของต้นแบบสำหรับตรวจแต่ละบทบาท; ไม่มีบัญชีเหล่านี้ในฐาน production
+ตัวแปรรหัสผ่านใช้เฉพาะสร้างบัญชีเริ่มต้น ไม่เปลี่ยนรหัสผ่านบัญชีที่มีอยู่แล้ว
+ฐานข้อมูล local และคีย์ 2FA อยู่ใน `data/` ซึ่งไม่ขึ้น Git
 
-`npm test`, `npm run build`, `npm run doctor`. Doctor requires the password environment variable. `build` checks JavaScript syntax; there is no bundling. Browser layout and accessibility QA remain pending.
+## การใช้งาน
 
-SQLite schema is initialized and versioned locally; a full reviewed incremental migration runner remains pending. API list is capped at 100 records; pagination/sorting, custom roles, account lockout, 2FA/reset, external adapters, API keys, webhook delivery, sandbox lifecycle, MySQL support and production deployment are not yet implemented. Sessions are SHA-256 digested at rest; mutations and audits share transactions. V1 already implements several identity controls and should be reused for the production migration rather than replaced by this prototype.
+1. ตั้งค่า **เวลาและ GPS**: พิกัดจริง รัศมี ความแม่นยำ เวลาเริ่มงาน ผ่อนผัน วันทำงาน วันหยุด
+2. ลงทะเบียนเจ้าหน้าที่ด้วยรหัส/ชื่อ/ตำแหน่งและเงินเดือนที่รับรอง เพิ่มนักคอมพิวเตอร์ได้
+3. สร้างบัญชีและผูกทะเบียนใน **ผู้ใช้งาน** ให้พนักงานใช้ **เช็กอินมือถือ** และ **ใบลา**
+4. ให้ HR จัดทำรายการ ผู้จัดการอนุมัติรายการของคนอื่น
+5. หน้า **กรรมการ** มีข้อมูลชุดที่ 38 ตามเว็บสหกรณ์ กำหนดวาระ/หน้าที่และเปิดบัญชีด้วยอีเมลที่ยืนยันแล้ว
+6. หน้ารายบุคคลมีลิงก์ `/#director/ID` มอบหมายงาน/ตัวชี้วัด ส่งผลงาน และประเมิน 0–100 โดยผู้ประเมินคนละคน
 
-See docs/v2/V1_AUDIT.md and docs/v2/ARCHITECTURE.md.
+ข้อมูลสาธารณะจาก [กรรมการ](https://rayongcoop.com/page.php?pid=3) และ [เจ้าหน้าที่](https://rayongcoop.com/page.php?pid=4) ตรวจเมื่อ 9 ตุลาคม 2569
+ตำแหน่งนักคอมพิวเตอร์เพิ่มเติมตามผู้ใช้แจ้ง ยังไม่เดาชื่อ อีเมล หรือเงินเดือน
+
+## ทดสอบและนำขึ้นระบบ
+
+```bash
+npm run build
+npm test
+npm audit --omit=dev --audit-level=moderate
+```
+
+ปลายทางทดสอบ: **https://rycoophr.tomvisolution.tech** พอร์ตแอป **3013** ผ่าน HTTPS proxy
+เตรียม Docker/Compose/Caddy และ GitHub Actions แล้ว; ยังต้องตั้ง DNS และ deploy ที่เครื่องโฮสต์
+
+- [คู่มือติดตั้งและ backup](docs/DEPLOYMENT.md)
+- [บทบาทและขอบเขตข้อมูล](docs/ROLES.md)
+- [ข้อกำหนดและสิ่งที่ต้องรับรอง](docs/REQUIREMENTS.md)
+- [การทดสอบ API และ Browser](docs/TESTING.md)
+
+รุ่นนี้ยังไม่เชื่อม API ระบบเงินฝาก/การเงินจริง ไม่คำนวณภาษีหรือสิทธิ์ลาที่สหกรณ์ยังไม่รับรอง และยังไม่มีทะเบียนครอบครัว/การศึกษาแบบเต็มหรือแนบไฟล์เอกสาร
+GPS จากเบราว์เซอร์ตรวจระยะและความแม่นยำได้ แต่ไม่รับรองการป้องกันการปลอมพิกัดของอุปกรณ์
+เอกสารใน `docs/v2/` คือข้อมูลอ้างอิงเดิมของ Tomvis V2 ที่คงไว้เพื่อแสดงที่มา
