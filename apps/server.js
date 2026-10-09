@@ -91,7 +91,10 @@ export function createApp(
           "/": "index.html",
           "/app.js": "hr-app.js",
           "/style.css": "style.css",
+          "/complete.css": "complete.css",
           "/mobile.js": "mobile.js",
+          "/complete.js": "complete.js",
+          "/leave-ui.js": "leave-ui.js",
           "/favicon.svg": "favicon.svg",
           "/favicon.ico": "favicon.svg",
         };

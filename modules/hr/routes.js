@@ -3,6 +3,8 @@ import { hashPassword } from "../../packages/security/index.js";
 import { rosterSources } from "./organization.js";
 import ExcelJS from "exceljs";
 import { attendanceRoutes } from "./attendance.js";
+import { extendedRoutes } from "./extended.js";
+import { leaveBalanceRoutes } from "./leave-balance.js";
 
 export async function hrRoutes(c) {
   const {
@@ -18,6 +20,8 @@ export async function hrRoutes(c) {
     audit,
   } = c;
   if (!url.pathname.startsWith("/api/v1/hr/")) return false;
+  if (await leaveBalanceRoutes(c)) return true;
+  if (await extendedRoutes(c)) return true;
   if (await attendanceRoutes(c)) return true;
   const path = url.pathname.slice("/api/v1/hr/".length),
     post = req.method === "POST",

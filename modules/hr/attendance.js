@@ -1,3 +1,4 @@
+import { leaveBalance, leaveDays } from "./leave-balance.js";
 export function bangkokDate(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Bangkok",
@@ -290,6 +291,32 @@ export async function attendanceRoutes(c) {
       b.note.length > 1000
     )
       fail(422, "ผลพิจารณาไม่ถูกต้อง");
+    if (b.status === "approved")
+      for (
+        let year = Number(row.start_day.slice(0, 4));
+        year <= Number(row.end_day.slice(0, 4));
+        year++
+      ) {
+        const balance = leaveBalance(
+          db,
+          u.tenant_id,
+          row.employee_id,
+          year,
+          row.kind,
+        );
+        if (balance.entitlement !== null) {
+          const days = leaveDays(
+            db,
+            u.tenant_id,
+            row.start_day,
+            row.end_day,
+            year,
+          );
+          if (days === null) fail(409, "ตั้งค่าปฏิทินทำงานก่อนตรวจสิทธิ์ลา");
+          if (days > balance.remaining)
+            fail(409, "จำนวนวันลาเกินสิทธิ์คงเหลือของปี " + year);
+        }
+      }
     atomic(() => {
       db.prepare(
         "UPDATE leave_requests SET status=?,approved_by=?,note=? WHERE id=?",
@@ -322,8 +349,10 @@ export async function attendanceRoutes(c) {
       onLeave = 0;
     atomic(() => {
       for (const e of db
-        .prepare("SELECT id FROM employees WHERE tenant_id=? AND active=1")
-        .all(u.tenant_id)) {
+        .prepare(
+          "SELECT id FROM employees WHERE tenant_id=? AND active=1 AND (start_date='' OR start_date<=?) AND (end_date='' OR end_date>=?)",
+        )
+        .all(u.tenant_id, b.day, b.day)) {
         const leave = db
           .prepare(
             "SELECT id FROM leave_requests WHERE tenant_id=? AND employee_id=? AND status='approved' AND start_day<=? AND end_day>=?",

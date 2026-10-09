@@ -1,4 +1,5 @@
 import { mobilePage } from "/mobile.js";
+import { completePage } from "/complete.js";
 const root = document.querySelector("#app");
 let me,
   page = "",
@@ -165,16 +166,29 @@ async function render() {
               "เจ้าหน้าที่",
               "สวัสดิการ",
               "เงินเดือนและโบนัส",
+              "ปรับเงินเดือน",
               "เวลาเข้าออก",
+              "รายงาน HR",
             ]
           : []),
-        ...(can("board.view") ? ["กรรมการ", "งานและผลงานกรรมการ"] : []),
+        ...(can("board.view")
+          ? [
+              "กรรมการ",
+              "ภาพรวมกรรมการ",
+              "งานและผลงานกรรมการ",
+              "การประชุมกรรมการ",
+            ]
+          : []),
         ...(can("directory.view") ? ["โครงสร้างองค์กร"] : []),
-        ...(can("attendance.self") ? ["เช็กอินมือถือ", "ใบลา"] : []),
+        ...(can("attendance.self")
+          ? ["เช็กอินมือถือ", "ใบลา", "สิทธิ์การลา", "สลิปของฉัน"]
+          : []),
         ...(can("attendance.configure") ? ["ตั้งค่าเวลาและ GPS"] : []),
         ...(can("users.view") ? ["ผู้ใช้งาน"] : []),
         ...(can("audit.view") ? ["ประวัติการใช้งาน"] : []),
+        ...(can("feedback.view") ? ["ข้อเสนอแนะ"] : []),
         "สิทธิ์และบทบาท",
+        "บัญชีของฉัน",
         "ความปลอดภัย",
       ];
   if (!pages.includes(page)) page = pages[0];
@@ -201,343 +215,360 @@ async function render() {
     b.onclick = fn;
     actions.append(b);
   };
-  if (page === "ความปลอดภัย") {
-    await security(view);
-    return;
-  }
-  if (can("hr.view")) employees = await api("hr/employees");
-  if (page === "ภาพรวม") {
-    const s = await api("hr/summary");
-    view.innerHTML = `<div class="stats">${[
-      ["เจ้าหน้าที่ในทะเบียน", s.employees],
-      ["สวัสดิการรออนุมัติ", s.pending],
-      ["ยอดจ่ายที่อนุมัติ (บาท)", money(s.payroll)],
-    ]
-      .map(
-        ([l, n]) =>
-          `<div class="card"><div class="stat-label">${l}</div><div class="stat-number">${n}</div></div>`,
-      )
-      .join(
-        "",
-      )}</div><div class="notice">เจ้าหน้าที่แยกจากกรรมการ รายการการเงินต้องมีผู้จัดทำและผู้อนุมัติคนละคน ยอดนี้รวมงวดที่อนุมัติทั้งหมด</div>`;
-  }
-  if (page === "เจ้าหน้าที่") {
-    view.innerHTML = `<div class="card">${table(
-      ["รหัส", "ชื่อ", "ฝ่าย / ตำแหน่ง", "ประเภท", "เงินเดือน (บาท)"],
-      employees.map((e) => [
-        esc(e.code),
-        esc(e.name),
-        esc(e.department),
-        esc(labels[e.kind]),
-        money(e.salary),
-      ]),
-    )}</div><div class="notice">ทะเบียนใช้รหัสและเงินเดือนที่ HR ยืนยัน รายชื่อจากเว็บอยู่ในหน้าโครงสร้างองค์กร</div>`;
-    if (can("hr.manage"))
-      add("เพิ่มเจ้าหน้าที่", () =>
-        dialog(
-          "ทะเบียนเจ้าหน้าที่",
-          field("code", "รหัสเจ้าหน้าที่") +
-            field("name", "ชื่อ–นามสกุล") +
-            field("department", "ฝ่าย / ตำแหน่ง") +
-            select("kind", "ประเภท", [
-              ["permanent", labels.permanent],
-              ["monthly", labels.monthly],
-              ["temporary", labels.temporary],
-            ]) +
-            field(
-              "salary",
-              "เงินเดือน (บาท)",
-              "number",
-              "0",
-              'min="0" step="0.01"',
-            ),
-          (b) => api("hr/employees", "POST", b),
-        ),
-      );
-  }
-  if (["สวัสดิการ", "เงินเดือนและโบนัส"].includes(page)) {
-    const welfare = page === "สวัสดิการ",
-      resource = welfare ? "welfare" : "payroll",
-      rows = await api("hr/" + resource);
-    view.innerHTML = `<div class="card">${table(
-      welfare
-        ? ["เจ้าหน้าที่", "ประเภท", "รายละเอียด", "ยอด", "สถานะ", "พิจารณา"]
-        : [
-            "เจ้าหน้าที่",
-            "งวด",
-            "ประเภท",
-            "รวม",
-            "หัก",
-            "สุทธิ",
-            "สถานะ",
-            "พิจารณา",
-          ],
-      rows.map((r) => [
-        esc(r.name),
-        ...(welfare
-          ? [esc(labels[r.kind]), esc(r.detail), money(r.amount)]
+  view.setAttribute("aria-busy", "true");
+  try {
+    if (page === "ความปลอดภัย") {
+      await security(view);
+      return;
+    }
+    if (await completePage(page, view, actions)) return;
+    if (can("hr.view")) employees = await api("hr/employees");
+    if (page === "ภาพรวม") {
+      const s = await api("hr/summary");
+      view.innerHTML = `<div class="stats">${[
+        ["เจ้าหน้าที่ในทะเบียน", s.employees],
+        ["สวัสดิการรออนุมัติ", s.pending],
+        ["ยอดจ่ายที่อนุมัติ (บาท)", money(s.payroll)],
+      ]
+        .map(
+          ([l, n]) =>
+            `<div class="card"><div class="stat-label">${l}</div><div class="stat-number">${n}</div></div>`,
+        )
+        .join(
+          "",
+        )}</div><div class="notice">เจ้าหน้าที่แยกจากกรรมการ รายการการเงินต้องมีผู้จัดทำและผู้อนุมัติคนละคน ยอดนี้รวมงวดที่อนุมัติทั้งหมด</div>`;
+    }
+    if (page === "เจ้าหน้าที่") {
+      view.innerHTML = `<div class="card">${table(
+        ["รหัส", "ชื่อ", "ฝ่าย / ตำแหน่ง", "ประเภท", "เงินเดือน (บาท)"],
+        employees.map((e) => [
+          esc(e.code),
+          esc(e.name),
+          esc(e.department),
+          esc(labels[e.kind]),
+          money(e.salary),
+        ]),
+      )}</div><div class="notice">ทะเบียนใช้รหัสและเงินเดือนที่ HR ยืนยัน รายชื่อจากเว็บอยู่ในหน้าโครงสร้างองค์กร</div>`;
+      if (can("hr.manage"))
+        add("เพิ่มเจ้าหน้าที่", () =>
+          dialog(
+            "ทะเบียนเจ้าหน้าที่",
+            field("code", "รหัสเจ้าหน้าที่") +
+              field("name", "ชื่อ–นามสกุล") +
+              field("department", "ฝ่าย / ตำแหน่ง") +
+              select("kind", "ประเภท", [
+                ["permanent", labels.permanent],
+                ["monthly", labels.monthly],
+                ["temporary", labels.temporary],
+              ]) +
+              field(
+                "salary",
+                "เงินเดือน (บาท)",
+                "number",
+                "0",
+                'min="0" step="0.01"',
+              ),
+            (b) => api("hr/employees", "POST", b),
+          ),
+        );
+    }
+    if (["สวัสดิการ", "เงินเดือนและโบนัส"].includes(page)) {
+      const welfare = page === "สวัสดิการ",
+        resource = welfare ? "welfare" : "payroll",
+        rows = await api("hr/" + resource);
+      view.innerHTML = `<div class="card">${table(
+        welfare
+          ? ["เจ้าหน้าที่", "ประเภท", "รายละเอียด", "ยอด", "สถานะ", "พิจารณา"]
           : [
-              esc(r.period),
-              esc(labels[r.kind]),
-              money(r.gross),
-              money(r.deductions),
-              money(r.net),
-            ]),
-        pill(r.status),
-        can("hr.approve") &&
-        r.created_by !== me.id &&
-        ["pending", "draft"].includes(r.status)
-          ? `<button data-decision="${r.id}" data-status="approved">อนุมัติ</button><button data-decision="${r.id}" data-status="rejected">ไม่อนุมัติ</button>`
-          : "—",
-      ]),
-    )}</div>`;
-    view.querySelectorAll("[data-decision]").forEach(
-      (b) =>
-        (b.onclick = async () => {
-          try {
-            await api(`hr/${resource}/${b.dataset.decision}/decision`, "POST", {
-              status: b.dataset.status,
-            });
-            await render();
-          } catch (e) {
-            toast(e.message);
-          }
-        }),
-    );
-    if (can("hr.manage"))
-      add("สร้างรายการ", () => {
-        if (!employees.length) return toast("เพิ่มเจ้าหน้าที่ก่อน");
-        dialog(
-          page,
-          employeeSelect() +
-            select(
-              "kind",
+              "เจ้าหน้าที่",
+              "งวด",
               "ประเภท",
-              welfare
-                ? [
-                    ["medical", labels.medical],
-                    ["tuition", labels.tuition],
-                    ["overtime", labels.overtime],
-                  ]
-                : [
-                    ["salary", labels.salary],
-                    ["bonus", labels.bonus],
-                  ],
-            ) +
-            (welfare
-              ? field(
-                  "amount",
-                  "ยอดขอเบิก (บาท)",
-                  "number",
-                  "",
-                  'min="0.01" step="0.01"',
-                ) +
-                area(
-                  "detail",
-                  "รายละเอียด / บุตร / ช่วงเวลา OT และหลักฐานอ้างอิง",
-                )
-              : field("period", "งวด (ค.ศ.)", "month") +
-                field(
-                  "multiplier",
-                  "จำนวนเท่า (โบนัส)",
-                  "number",
-                  "1",
-                  'min="0" max="24" step="0.01"',
-                ) +
-                field(
-                  "additions",
-                  "รายได้เพิ่ม (เงินเดือน)",
-                  "number",
-                  "0",
-                  'min="0" step="0.01"',
-                ) +
-                field(
-                  "deductions",
-                  "ยอดหักที่ได้รับอนุมัติ (บาท)",
-                  "number",
-                  "0",
-                  'min="0" step="0.01"',
-                )),
-          (b) => api("hr/" + resource, "POST", b),
-        );
-      });
-  }
-  if (page === "เวลาเข้าออก") {
-    const rows = await api("hr/attendance");
-    view.innerHTML = `<div class="card"><h2>นำเข้าจากเครื่องสแกน</h2><p>Excel .xlsx ไม่เกิน 1 MB / 500 แถว หัวตาราง: code, name, day, check_in, check_out<br>วันที่ YYYY-MM-DD เวลา HH:mm เวลาไทย เกณฑ์เริ่มต้น: สายหลัง 08:30</p>${can("hr.manage") ? '<label>เลือกไฟล์<input id="xlsx" type="file" accept=".xlsx"></label><button id="import" class="primary">ตรวจและนำเข้า</button><pre id="result"></pre>' : ""}${table(
-      ["รหัส", "ชื่อ", "วันที่", "เข้า", "ออก", "สถานะ"],
-      rows.map((r) => [
-        esc(r.code),
-        esc(r.name),
-        esc(r.day),
-        esc(r.check_in || "—"),
-        esc(r.check_out || "—"),
-        pill(r.status),
-      ]),
-    )}</div>`;
-    view.querySelector("#import")?.addEventListener("click", async () => {
-      const file = view.querySelector("#xlsx").files[0];
-      if (!file || file.size > 1000000)
-        return toast("เลือก Excel ไม่เกิน 1 MB");
-      try {
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        let binary = "";
-        for (const byte of bytes) binary += String.fromCharCode(byte);
-        const r = await api("hr/attendance/xlsx", "POST", {
-          base64: btoa(binary),
+              "รวม",
+              "หัก",
+              "สุทธิ",
+              "สถานะ",
+              "พิจารณา",
+            ],
+        rows.map((r) => [
+          esc(r.name),
+          ...(welfare
+            ? [esc(labels[r.kind]), esc(r.detail), money(r.amount)]
+            : [
+                esc(r.period),
+                esc(labels[r.kind]),
+                money(r.gross),
+                money(r.deductions),
+                money(r.net),
+              ]),
+          pill(r.status),
+          can("hr.approve") &&
+          r.created_by !== me.id &&
+          ["pending", "draft"].includes(r.status)
+            ? `<button data-decision="${r.id}" data-status="approved">อนุมัติ</button><button data-decision="${r.id}" data-status="rejected">ไม่อนุมัติ</button>`
+            : "—",
+        ]),
+      )}</div>`;
+      view.querySelectorAll("[data-decision]").forEach(
+        (b) =>
+          (b.onclick = async () => {
+            try {
+              await api(
+                `hr/${resource}/${b.dataset.decision}/decision`,
+                "POST",
+                {
+                  status: b.dataset.status,
+                },
+              );
+              await render();
+            } catch (e) {
+              toast(e.message);
+            }
+          }),
+      );
+      if (can("hr.manage"))
+        add("สร้างรายการ", () => {
+          if (!employees.length) return toast("เพิ่มเจ้าหน้าที่ก่อน");
+          dialog(
+            page,
+            employeeSelect() +
+              select(
+                "kind",
+                "ประเภท",
+                welfare
+                  ? [
+                      ["medical", labels.medical],
+                      ["tuition", labels.tuition],
+                      ["overtime", labels.overtime],
+                    ]
+                  : [
+                      ["salary", labels.salary],
+                      ["bonus", labels.bonus],
+                    ],
+              ) +
+              (welfare
+                ? field(
+                    "amount",
+                    "ยอดขอเบิก (บาท)",
+                    "number",
+                    "",
+                    'min="0.01" step="0.01"',
+                  ) +
+                  area(
+                    "detail",
+                    "รายละเอียด / บุตร / ช่วงเวลา OT และหลักฐานอ้างอิง",
+                  )
+                : field("period", "งวด (ค.ศ.)", "month") +
+                  field(
+                    "multiplier",
+                    "จำนวนเท่า (โบนัส)",
+                    "number",
+                    "1",
+                    'min="0" max="24" step="0.01"',
+                  ) +
+                  field(
+                    "additions",
+                    "รายได้เพิ่ม (เงินเดือน)",
+                    "number",
+                    "0",
+                    'min="0" step="0.01"',
+                  ) +
+                  field(
+                    "deductions",
+                    "ยอดหักที่ได้รับอนุมัติ (บาท)",
+                    "number",
+                    "0",
+                    'min="0" step="0.01"',
+                  )),
+            (b) => api("hr/" + resource, "POST", b),
+          );
         });
-        view.querySelector("#result").textContent = JSON.stringify(r, null, 2);
-        toast(
-          `นำเข้าสำเร็จ ${r.accepted} แถว / ไม่ผ่าน ${r.errors.length} แถว`,
+    }
+    if (page === "เวลาเข้าออก") {
+      const rows = await api("hr/attendance");
+      view.innerHTML = `<div class="card"><h2>นำเข้าจากเครื่องสแกน</h2><p>Excel .xlsx ไม่เกิน 1 MB / 500 แถว หัวตาราง: code, name, day, check_in, check_out<br>วันที่ YYYY-MM-DD เวลา HH:mm เวลาไทย เกณฑ์เริ่มต้น: สายหลัง 08:30</p>${can("hr.manage") ? '<label>เลือกไฟล์<input id="xlsx" type="file" accept=".xlsx"></label><button id="import" class="primary">ตรวจและนำเข้า</button><pre id="result"></pre>' : ""}${table(
+        ["รหัส", "ชื่อ", "วันที่", "เข้า", "ออก", "สถานะ"],
+        rows.map((r) => [
+          esc(r.code),
+          esc(r.name),
+          esc(r.day),
+          esc(r.check_in || "—"),
+          esc(r.check_out || "—"),
+          pill(r.status),
+        ]),
+      )}</div>`;
+      view.querySelector("#import")?.addEventListener("click", async () => {
+        const file = view.querySelector("#xlsx").files[0];
+        if (!file || file.size > 1000000)
+          return toast("เลือก Excel ไม่เกิน 1 MB");
+        try {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let binary = "";
+          for (const byte of bytes) binary += String.fromCharCode(byte);
+          const r = await api("hr/attendance/xlsx", "POST", {
+            base64: btoa(binary),
+          });
+          view.querySelector("#result").textContent = JSON.stringify(
+            r,
+            null,
+            2,
+          );
+          toast(
+            `นำเข้าสำเร็จ ${r.accepted} แถว / ไม่ผ่าน ${r.errors.length} แถว`,
+          );
+        } catch (e) {
+          toast(e.message);
+        }
+      });
+    }
+    if (["เช็กอินมือถือ", "ใบลา", "ตั้งค่าเวลาและ GPS"].includes(page)) {
+      await mobilePage(page, view, actions);
+      return;
+    }
+    if (page === "โครงสร้างองค์กร") {
+      const d = await api("hr/directory");
+      view.innerHTML = `<div class="card">${table(
+        ["ชื่อ", "ตำแหน่ง", "แหล่งข้อมูล"],
+        d.staff.map((s) => [
+          esc(s.name),
+          esc(s.position),
+          s.source.startsWith("https:")
+            ? "หน้าเจ้าหน้าที่สหกรณ์"
+            : "ผู้ใช้แจ้งเพิ่มเติม",
+        ]),
+      )}</div><div class="notice">รายชื่อจากเว็บ ณ ${esc(d.sources.retrieved)} · นักคอมพิวเตอร์รอระบุชื่อ · ตำแหน่งงานแยกจากสิทธิ์ระบบ</div>`;
+    }
+    if (page === "กรรมการ") {
+      directors = await api("hr/directors");
+      view.innerHTML = `<div class="module-grid">${directors.map((d) => `<div class="card"><span class="badge">${esc(d.position)}</span><h2>${esc(d.name)}</h2><p>วาระ ${esc(d.term_start || "รอยืนยัน")} – ${esc(d.term_end || "รอยืนยัน")}</p><p>${d.committees.map((c) => esc(c.committee + " · " + c.position)).join("<br>")}</p><p>${esc(d.duties)}</p><div class="actions"><button data-person="${d.id}">หน้ารายบุคคล</button></div></div>`).join("")}</div><div class="notice">ชุดที่ 38 ตามเว็บสหกรณ์ หน้าที่เริ่มต้นเป็นข้อเสนอ รอสหกรณ์รับรอง</div>`;
+      view
+        .querySelectorAll("[data-person]")
+        .forEach(
+          (b) =>
+            (b.onclick = () =>
+              profile(
+                directors.find((d) => d.id === Number(b.dataset.person)),
+              ).catch((e) => toast(e.message))),
         );
-      } catch (e) {
-        toast(e.message);
-      }
-    });
-  }
-  if (["เช็กอินมือถือ", "ใบลา", "ตั้งค่าเวลาและ GPS"].includes(page)) {
-    await mobilePage(page, view, actions);
-    return;
-  }
-  if (page === "โครงสร้างองค์กร") {
-    const d = await api("hr/directory");
-    view.innerHTML = `<div class="card">${table(
-      ["ชื่อ", "ตำแหน่ง", "แหล่งข้อมูล"],
-      d.staff.map((s) => [
-        esc(s.name),
-        esc(s.position),
-        s.source.startsWith("https:")
-          ? "หน้าเจ้าหน้าที่สหกรณ์"
-          : "ผู้ใช้แจ้งเพิ่มเติม",
-      ]),
-    )}</div><div class="notice">รายชื่อจากเว็บ ณ ${esc(d.sources.retrieved)} · นักคอมพิวเตอร์รอระบุชื่อ · ตำแหน่งงานแยกจากสิทธิ์ระบบ</div>`;
-  }
-  if (page === "กรรมการ") {
-    directors = await api("hr/directors");
-    view.innerHTML = `<div class="module-grid">${directors.map((d) => `<div class="card"><span class="badge">${esc(d.position)}</span><h2>${esc(d.name)}</h2><p>วาระ ${esc(d.term_start || "รอยืนยัน")} – ${esc(d.term_end || "รอยืนยัน")}</p><p>${d.committees.map((c) => esc(c.committee + " · " + c.position)).join("<br>")}</p><p>${esc(d.duties)}</p><div class="actions"><button data-person="${d.id}">หน้ารายบุคคล</button></div></div>`).join("")}</div><div class="notice">ชุดที่ 38 ตามเว็บสหกรณ์ หน้าที่เริ่มต้นเป็นข้อเสนอ รอสหกรณ์รับรอง</div>`;
-    view
-      .querySelectorAll("[data-person]")
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            profile(
-              directors.find((d) => d.id === Number(b.dataset.person)),
-            ).catch((e) => toast(e.message))),
-      );
-  }
-  if (page === "งานและผลงานกรรมการ") {
-    directors = await api("hr/directors");
-    const tasks = await api("hr/tasks");
-    view.innerHTML = `<div class="card">${table(
-      [
-        "กรรมการ",
-        "งาน / ตัวชี้วัด",
-        "กำหนดส่ง",
-        "ผลงาน",
-        "สถานะ",
-        "ผลประเมิน",
-        "ดำเนินการ",
-      ],
-      tasks.map((t) => [
-        esc(t.name),
-        `<strong>${esc(t.title)}</strong><br>${esc(t.indicator)}`,
-        esc(t.due_date),
-        esc(t.outcome),
-        pill(t.status),
-        t.score == null ? "—" : `${t.score}/100 · ${esc(t.review)}`,
-        `<button data-task="${t.id}">ดูรายละเอียด</button>`,
-      ]),
-    )}</div>`;
-    view
-      .querySelectorAll("[data-task]")
-      .forEach(
-        (b) =>
-          (b.onclick = () =>
-            taskDialog(tasks.find((t) => t.id === Number(b.dataset.task)))),
-      );
-    if (can("board.assign"))
-      add("มอบหมายงาน", () =>
-        dialog(
-          "มอบหมายงานกรรมการ",
-          select(
-            "director_id",
-            "กรรมการ",
-            directors.map((d) => [d.id, d.name]),
-          ) +
-            field("title", "งาน / โครงการ") +
-            area("indicator", "ตัวชี้วัดและเป้าหมาย") +
-            field("due_date", "กำหนดส่ง", "date"),
-          (b) => api("hr/tasks", "POST", b),
-        ),
-      );
-  }
-  if (page === "ผู้ใช้งาน") {
-    const users = await api("users");
-    view.innerHTML = `<div class="card">${table(
-      ["ชื่อ", "อีเมล", "สิทธิ์", "สถานะ"],
-      users.map((u) => [
-        esc(u.name),
-        esc(u.email),
-        esc(u.role),
-        u.disabled ? "ปิดใช้งาน" : "เปิดใช้งาน",
-      ]),
-    )}</div>`;
-    if (can("users.manage"))
-      add("เพิ่มบัญชีเจ้าหน้าที่", () =>
-        dialog(
-          "บัญชีเจ้าหน้าที่",
-          field("name", "ชื่อ–นามสกุล") +
-            field("email", "อีเมล", "email") +
-            field(
-              "password",
-              "รหัสผ่านเริ่มต้น 12 ตัวขึ้นไป",
-              "password",
-              "",
-              'minlength="12" autocomplete="new-password"',
-            ) +
-            (can("hr.manage")
-              ? select("employee_id", "ผูกทะเบียนเจ้าหน้าที่", [
-                  ["", "ยังไม่ผูก"],
-                  ...employees.map((e) => [e.id, e.code + " · " + e.name]),
-                ])
-              : "") +
+    }
+    if (page === "งานและผลงานกรรมการ") {
+      directors = await api("hr/directors");
+      const tasks = await api("hr/tasks");
+      view.innerHTML = `<div class="card">${table(
+        [
+          "กรรมการ",
+          "งาน / ตัวชี้วัด",
+          "กำหนดส่ง",
+          "ผลงาน",
+          "สถานะ",
+          "ผลประเมิน",
+          "ดำเนินการ",
+        ],
+        tasks.map((t) => [
+          esc(t.name),
+          `<strong>${esc(t.title)}</strong><br>${esc(t.indicator)}`,
+          esc(t.due_date),
+          esc(t.outcome),
+          pill(t.status),
+          t.score == null ? "—" : `${t.score}/100 · ${esc(t.review)}`,
+          `<button data-task="${t.id}">ดูรายละเอียด</button>`,
+        ]),
+      )}</div>`;
+      view
+        .querySelectorAll("[data-task]")
+        .forEach(
+          (b) =>
+            (b.onclick = () =>
+              taskDialog(tasks.find((t) => t.id === Number(b.dataset.task)))),
+        );
+      if (can("board.assign"))
+        add("มอบหมายงาน", () =>
+          dialog(
+            "มอบหมายงานกรรมการ",
             select(
-              "role",
-              "สิทธิ์",
-              (["admin", "super_admin"].includes(me.role)
-                ? ["staff", "hr_officer", "manager", "it_admin", "viewer"]
-                : ["staff", "viewer"]
-              ).map((r) => [r, r]),
-            ),
-          (b) => api("hr/accounts", "POST", b),
-        ),
+              "director_id",
+              "กรรมการ",
+              directors.map((d) => [d.id, d.name]),
+            ) +
+              field("title", "งาน / โครงการ") +
+              area("indicator", "ตัวชี้วัดและเป้าหมาย") +
+              field("due_date", "กำหนดส่ง", "date"),
+            (b) => api("hr/tasks", "POST", b),
+          ),
+        );
+    }
+    if (page === "ผู้ใช้งาน") {
+      const users = await api("users");
+      view.innerHTML = `<div class="card">${table(
+        ["ชื่อ", "อีเมล", "สิทธิ์", "สถานะ"],
+        users.map((u) => [
+          esc(u.name),
+          esc(u.email),
+          esc(u.role),
+          u.disabled ? "ปิดใช้งาน" : "เปิดใช้งาน",
+        ]),
+      )}</div>`;
+      if (can("users.manage"))
+        add("เพิ่มบัญชีเจ้าหน้าที่", () =>
+          dialog(
+            "บัญชีเจ้าหน้าที่",
+            field("name", "ชื่อ–นามสกุล") +
+              field("email", "อีเมล", "email") +
+              field(
+                "password",
+                "รหัสผ่านเริ่มต้น 12 ตัวขึ้นไป",
+                "password",
+                "",
+                'minlength="12" autocomplete="new-password"',
+              ) +
+              (can("hr.manage")
+                ? select("employee_id", "ผูกทะเบียนเจ้าหน้าที่", [
+                    ["", "ยังไม่ผูก"],
+                    ...employees.map((e) => [e.id, e.code + " · " + e.name]),
+                  ])
+                : "") +
+              select(
+                "role",
+                "สิทธิ์",
+                (["admin", "super_admin"].includes(me.role)
+                  ? ["staff", "hr_officer", "manager", "it_admin", "viewer"]
+                  : ["staff", "viewer"]
+                ).map((r) => [r, r]),
+              ),
+            (b) => api("hr/accounts", "POST", b),
+          ),
+        );
+    }
+    if (page === "ประวัติการใช้งาน") {
+      const logs = await api("audit");
+      view.innerHTML = `<div class="card">${table(
+        ["การกระทำ", "ผู้ใช้", "ข้อมูล", "เวลา (UTC)"],
+        logs.map((l) => [
+          esc(l.action),
+          esc(l.actor),
+          esc(l.resource),
+          esc(l.timestamp),
+        ]),
+      )}</div>`;
+    }
+    if (page === "สิทธิ์และบทบาท") {
+      const permissions = [...new Set(Object.values(me.roles).flat())].filter(
+        (p) => p !== "*",
       );
-  }
-  if (page === "ประวัติการใช้งาน") {
-    const logs = await api("audit");
-    view.innerHTML = `<div class="card">${table(
-      ["การกระทำ", "ผู้ใช้", "ข้อมูล", "เวลา (UTC)"],
-      logs.map((l) => [
-        esc(l.action),
-        esc(l.actor),
-        esc(l.resource),
-        esc(l.timestamp),
-      ]),
-    )}</div>`;
-  }
-  if (page === "สิทธิ์และบทบาท") {
-    const permissions = [...new Set(Object.values(me.roles).flat())].filter(
-      (p) => p !== "*",
-    );
-    view.innerHTML = `<div class="card permission">${table(
-      ["สิทธิ์", ...Object.keys(me.roles)],
-      permissions.map((p) => [
-        esc(p),
-        ...Object.values(me.roles).map((list) =>
-          list.includes("*") || list.includes(p) ? "✓" : "—",
-        ),
-      ]),
-    )}</div><div class="notice">กรรมการเห็นงานตนเอง ประธานดูและประเมินกรรมการ IT ไม่มีสิทธิ์เงินเดือน HR จัดทำรายการ ผู้จัดการอนุมัติรายการที่ตนไม่ได้จัดทำ</div>`;
+      view.innerHTML = `<div class="card permission">${table(
+        ["สิทธิ์", ...Object.keys(me.roles)],
+        permissions.map((p) => [
+          esc(p),
+          ...Object.values(me.roles).map((list) =>
+            list.includes("*") || list.includes(p) ? "✓" : "—",
+          ),
+        ]),
+      )}</div><div class="notice">กรรมการเห็นงานตนเอง ประธานดูและประเมินกรรมการ IT ไม่มีสิทธิ์เงินเดือน HR จัดทำรายการ ผู้จัดการอนุมัติรายการที่ตนไม่ได้จัดทำ</div>`;
+    }
+  } catch (e) {
+    view.innerHTML = `<div class="notice">${esc(e.message)}</div>`;
+    throw e;
+  } finally {
+    view.setAttribute("aria-busy", "false");
   }
 }
 async function profile(d) {

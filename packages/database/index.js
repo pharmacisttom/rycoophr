@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { hashPassword } from "../security/index.js";
 import { seedOrganization } from "../../modules/hr/organization.js";
+import { extendedSchema } from "../../modules/hr/extended-schema.js";
 export function createDatabase(
   path,
   password,
@@ -94,6 +95,7 @@ export function createDatabase(
     db.exec("ROLLBACK");
     throw e;
   }
+  extendedSchema(db);
   return db;
 }
 export function seed(db, tenant) {
